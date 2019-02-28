@@ -16,14 +16,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dcmjs-org/dcmjs.git"
+    "url": "git+https://github.com/jmhmd/dcmjs.git"
   },
   "author": "Steve Pieper",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/dcmjs-org/dcmjs/issues"
   },
-  "homepage": "https://github.com/dcmjs-org/dcmjs#readme",
+  "homepage": "https://github.com/jmhmd/dcmjs#readme",
   "devDependencies": {
     "@babel/core": "^7.2.2",
     "@babel/preset-env": "^7.3.1",
