@@ -1,5 +1,5 @@
 const toArray = function(x) {
-    return x.constructor.name === "Array" ? x : [x];
+    return Array.isArray(x) ? x : [x];
 };
 
 const codeMeaningEquals = codeMeaningName => {
@@ -10,4 +10,10 @@ const codeMeaningEquals = codeMeaningName => {
     };
 };
 
-export { toArray, codeMeaningEquals };
+const graphicTypeEquals = graphicType => {
+    return contentItem => {
+        return contentItem && contentItem.GraphicType === graphicType;
+    };
+};
+
+export { toArray, codeMeaningEquals, graphicTypeEquals };

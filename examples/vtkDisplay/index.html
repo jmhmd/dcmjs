@@ -36,11 +36,9 @@
 </div>
 </body>
 
-<script src="../js/jquery.min.js"></script>
-<script src="../js/jqueryFileDrop.js"></script>
+<script src="https://unpkg.com/jquery@2.2.4/dist/jquery.js"></script>
 
 <script src="../helpers/DICOMZero.js"></script>
-
 
 <script src="https://unpkg.com/dicomweb-client"></script>
 <script src="https://unpkg.com/dcmjs"></script>
@@ -416,9 +414,16 @@ return Object.freeze({ newInstance, extend, SlicingMode });
 
       // NB: DICOM PixelSpacing is defined as Row then Column,
       // unlike ImageOrientationPatient
+      let spacingBetweenSlices = pixelMeasures.SpacingBetweenSlices;
+      if (!spacingBetweenSlices) {
+        if (pixelMeasures.SliceThickness) {
+          console.log("Using SliceThickness as SpacingBetweenSlices");
+          spacingBetweenSlices = pixelMeasures.SliceThickness;
+        }
+      }
       geometry.spacing = [pixelMeasures.PixelSpacing[1],
                           pixelMeasures.PixelSpacing[0],
-                          pixelMeasures.SpacingBetweenSlices].map(Number);
+                          spacingBetweenSlices].map(Number);
 
       geometry.dimensions = [dataset.Columns,
                              dataset.Rows,

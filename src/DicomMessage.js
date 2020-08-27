@@ -67,13 +67,13 @@ class DicomMessage {
         return encapsulatedSyntaxes.indexOf(syntax) != -1;
     }
 
-    static readFile(buffer, options) {
-        var { ignoreErrors } = options;
+    static readFile(buffer, options = { ignoreErrors: false }) {
+        const { ignoreErrors } = options;
         var stream = new ReadBufferStream(buffer),
             useSyntax = EXPLICIT_LITTLE_ENDIAN;
         stream.reset();
         stream.increment(128);
-        if (stream.readString(4) != "DICM") {
+        if (stream.readString(4) !== "DICM") {
             throw new Error("Invalid a dicom file");
         }
         var el = DicomMessage.readTag(stream, useSyntax),
@@ -173,13 +173,16 @@ class DicomMessage {
         } else {
             var val = vr.read(stream, length, syntax);
             if (!vr.isBinary() && singleVRs.indexOf(vr.type) == -1) {
-                values = val.split(String.fromCharCode(0x5c));
+                values = val;
+                if (typeof val === "string") {
+                    values = val.split(String.fromCharCode(0x5c));
+                }
             } else if (vr.type == "SQ") {
                 values = val;
             } else if (vr.type == "OW" || vr.type == "OB") {
                 values = val;
             } else {
-                values.push(val);
+                Array.isArray(val) ? (values = val) : values.push(val);
             }
         }
         stream.setEndian(oldEndian);
