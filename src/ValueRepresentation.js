@@ -132,7 +132,9 @@ class ValueRepresentation {
                 checklen = lengths[i],
                 isString = false,
                 displaylen = checklen;
-            if (this.checkLength) {
+            if (checkValue === null) {
+                valid = true;
+            } else if (this.checkLength) {
                 valid = this.checkLength(checkValue);
             } else if (this.maxCharLength) {
                 var check = this.maxCharLength; //, checklen = checkValue.length;
@@ -228,7 +230,7 @@ class StringRepresentation extends ValueRepresentation {
     }
 
     writeBytes(stream, value) {
-        var written = super.write(stream, "String", value);
+        const written = super.write(stream, "String", value);
 
         return super.writeBytes(stream, value, written);
     }
@@ -318,35 +320,23 @@ class BinaryRepresentation extends ValueRepresentation {
                 } else {
                     offsets = [0];
                 }
-                var nextTag = Tag.readTag(stream),
-                    fragmentStream = null,
-                    start = 4,
-                    frameOffset = offsets.shift();
 
-                while (nextTag.is(0xfffee000)) {
-                    if (frameOffset == start) {
-                        frameOffset = offsets.shift();
-                        if (fragmentStream !== null) {
-                            frames.push(fragmentStream.buffer);
-                            fragmentStream = null;
-                        }
-                    }
-                    var frameItemLength = stream.readUint32(),
-                        thisStream = stream.more(frameItemLength);
+                for (let i = 0; i < offsets.length; i++) {
+                    const nextTag = Tag.readTag(stream);
 
-                    if (fragmentStream === null) {
-                        fragmentStream = thisStream;
-                    } else {
-                        fragmentStream.concat(thisStream);
+                    if (!nextTag.is(0xfffee000)) {
+                        break;
                     }
 
-                    nextTag = Tag.readTag(stream);
-                    start += 4 + frameItemLength;
-                }
-                if (fragmentStream !== null) {
+                    const frameItemLength = stream.readUint32();
+                    const fragmentStream = stream.more(frameItemLength);
+
                     frames.push(fragmentStream.buffer);
                 }
 
+                // Read SequenceDelimitationItem Tag
+                stream.readUint32();
+                // Read SequenceDelimitationItem value.
                 stream.readUint32();
             } else {
                 throw new Error(
@@ -446,10 +436,23 @@ class DecimalString extends StringRepresentation {
     }
 
     readBytes(stream, length) {
+        const BACKSLASH = String.fromCharCode(0x5c);
         //return this.readNullPaddedString(stream, length).trim();
         let ds = stream.readString(length);
         ds = ds.replace(/[^0-9.\\\-+e]/gi, "");
+        if (ds.indexOf(BACKSLASH) !== -1) {
+            // handle decimal string with multiplicity
+            const dsArray = ds.split(BACKSLASH);
+            ds = dsArray.map(ds => Number(ds));
+        } else {
+            ds = [Number(ds)];
+        }
+
         return ds;
+    }
+
+    writeBytes(stream, value) {
+        return super.writeBytes(stream, value.map(String));
     }
 }
 
@@ -471,7 +474,7 @@ class FloatingPointSingle extends ValueRepresentation {
     }
 
     readBytes(stream) {
-        return stream.readFloat();
+        return Number(stream.readFloat());
     }
 
     writeBytes(stream, value) {
@@ -493,7 +496,7 @@ class FloatingPointDouble extends ValueRepresentation {
     }
 
     readBytes(stream) {
-        return stream.readDouble();
+        return Number(stream.readDouble());
     }
 
     writeBytes(stream, value) {
@@ -513,8 +516,24 @@ class IntegerString extends StringRepresentation {
     }
 
     readBytes(stream, length) {
-        //return this.readNullPaddedString(stream, length);
-        return stream.readString(length).trim();
+        const BACKSLASH = String.fromCharCode(0x5c);
+        let is = stream.readString(length).trim();
+
+        is = is.replace(/[^0-9.\\\-+e]/gi, "");
+
+        if (is.indexOf(BACKSLASH) !== -1) {
+            // handle integer string with multiplicity
+            const integerStringArray = is.split(BACKSLASH);
+            is = integerStringArray.map(is => Number(is));
+        } else {
+            is = [Number(is)];
+        }
+
+        return is;
+    }
+
+    writeBytes(stream, value) {
+        return super.writeBytes(stream, value.map(String));
     }
 }
 
@@ -552,9 +571,22 @@ class PersonName extends StringRepresentation {
     }
 
     checkLength(value) {
-        var cmps = value.split(/\^/);
-        for (var i in cmps) {
-            var cmp = cmps[i];
+        var components = [];
+        if (typeof value === "object" && value !== null) {
+            // In DICOM JSON, components are encoded as a mapping (object),
+            // where the keys are one or more of the following: "Alphabetic",
+            // "Ideographic", "Phonetic".
+            // http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_F.2.2.html
+            components = Object.keys(value).forEach(key => value[key]);
+        } else if (typeof value === "string" || value instanceof String) {
+            // In DICOM Part10, components are encoded as a string,
+            // where components ("Alphabetic", "Ideographic", "Phonetic")
+            // are separated by the "=" delimeter.
+            // http://dicom.nema.org/medical/dicom/current/output/chtml/part05/sect_6.2.html
+            components = value.split(/\=/);
+        }
+        for (var i in components) {
+            var cmp = components[i];
             if (cmp.length > 64) return false;
         }
         return true;
@@ -642,24 +674,37 @@ class SequenceOfItems extends ValueRepresentation {
                         while (1) {
                             var g = stream.readUint16();
                             if (g == 0xfffe) {
+                                // some control tag is about to be read
                                 var ge = stream.readUint16();
                                 if (ge == 0xe00d) {
+                                    // item delimitation tag has been read
                                     stack--;
                                     if (stack < 0) {
+                                        // if we are outside every stack, then we are finished reading the sequence of items
                                         stream.increment(4);
                                         read += 8;
                                         break;
                                     } else {
+                                        // otherwise, we were in a nested sequence of items
                                         toRead += 4;
                                     }
                                 } else if (ge == 0xe000) {
+                                    // a new item has been found
                                     stack++;
                                     toRead += 4;
+                                    var itemLength = stream.readUint32();
+                                    stream.increment(-4);
+                                    if (itemLength === 0) {
+                                        // in some odd cases, DICOMs rely on the length being zero to denote that the item has closed
+                                        stack--;
+                                    }
                                 } else {
+                                    // some control tag that does not concern sequence of items has been read
                                     toRead += 2;
                                     stream.increment(-2);
                                 }
                             } else {
+                                // anything else has been read
                                 toRead += 2;
                             }
                         }

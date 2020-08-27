@@ -1,3 +1,4 @@
+// Data
 import { BitArray } from "./bitArray.js";
 import { ReadBufferStream } from "./BufferStream.js";
 import { WriteBufferStream } from "./BufferStream.js";
@@ -7,9 +8,36 @@ import { DicomMetaDictionary } from "./DicomMetaDictionary.js";
 import { DICOMWEB } from "./dicomweb.js";
 import { Tag } from "./Tag.js";
 import { ValueRepresentation } from "./ValueRepresentation.js";
-//export { anonymizer } from './anonymizer.js';
 import { Colors } from "./colors.js";
-import { datasetToBlob } from "./datasetToBlob.js";
+import {
+    datasetToDict,
+    datasetToBuffer,
+    datasetToBlob
+} from "./datasetToBlob.js";
+// Derivations
+import {
+    DerivedDataset,
+    DerivedPixels,
+    DerivedImage,
+    Segmentation,
+    StructuredReport,
+    ParametricMap
+} from "./derivations/index.js";
+// Normalizers
+
+import { Normalizer } from "./normalizers.js";
+import { ImageNormalizer } from "./normalizers.js";
+import { MRImageNormalizer } from "./normalizers.js";
+import { EnhancedMRImageNormalizer } from "./normalizers.js";
+import { EnhancedUSVolumeNormalizer } from "./normalizers.js";
+import { CTImageNormalizer } from "./normalizers.js";
+import { PETImageNormalizer } from "./normalizers.js";
+import { SEGImageNormalizer } from "./normalizers.js";
+import { DSRNormalizer } from "./normalizers.js";
+
+import adapters from "./adapters/index.js";
+import utilities from "./utilities/index.js";
+import sr from "./sr/index.js";
 
 let data = {
     BitArray,
@@ -21,17 +49,10 @@ let data = {
     Tag,
     ValueRepresentation,
     Colors,
+    datasetToDict,
+    datasetToBuffer,
     datasetToBlob
 };
-
-export { data };
-
-import { DerivedDataset } from "./derivations.js";
-import { DerivedPixels } from "./derivations.js";
-import { DerivedImage } from "./derivations.js";
-import { Segmentation } from "./derivations.js";
-import { StructuredReport } from "./derivations.js";
-import { ParametricMap } from "./derivations.js";
 
 let derivations = {
     DerivedDataset,
@@ -41,18 +62,6 @@ let derivations = {
     StructuredReport,
     ParametricMap
 };
-
-export { derivations };
-
-import { Normalizer } from "./normalizers.js";
-import { ImageNormalizer } from "./normalizers.js";
-import { MRImageNormalizer } from "./normalizers.js";
-import { EnhancedMRImageNormalizer } from "./normalizers.js";
-import { EnhancedUSVolumeNormalizer } from "./normalizers.js";
-import { CTImageNormalizer } from "./normalizers.js";
-import { PETImageNormalizer } from "./normalizers.js";
-import { SEGImageNormalizer } from "./normalizers.js";
-import { DSRNormalizer } from "./normalizers.js";
 
 let normalizers = {
     Normalizer,
@@ -66,11 +75,16 @@ let normalizers = {
     DSRNormalizer
 };
 
-export { normalizers };
+const dcmjs = {
+    DICOMWEB,
+    adapters,
+    data,
+    derivations,
+    normalizers,
+    sr,
+    utilities
+};
 
-import adapters from "./adapters/index.js";
-import utilities from "./utilities/index.js";
+export { DICOMWEB, adapters, data, derivations, normalizers, sr, utilities };
 
-export { adapters };
-export { utilities };
-export { DICOMWEB };
+export default dcmjs;
