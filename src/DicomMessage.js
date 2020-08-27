@@ -30,13 +30,18 @@ const encapsulatedSyntaxes = [
 ];
 
 class DicomMessage {
-    static read(bufferStream, syntax, ignoreErrors) {
+    static read(bufferStream, syntax, ignoreErrors, untilTag) {
         var dict = {};
         try {
             while (!bufferStream.end()) {
-                var readInfo = DicomMessage.readTag(bufferStream, syntax);
+                const readInfo = DicomMessage.readTag(bufferStream, syntax);
+                const cleanTagString = readInfo.tag.toCleanString();
 
-                dict[readInfo.tag.toCleanString()] = {
+                if (untilTag && untilTag === cleanTagString) {
+                    break;
+                }
+
+                dict[cleanTagString] = {
                     vr: readInfo.vr.type,
                     Value: readInfo.values
                 };
@@ -67,13 +72,13 @@ class DicomMessage {
         return encapsulatedSyntaxes.indexOf(syntax) != -1;
     }
 
-    static readFile(buffer, options) {
-        var { ignoreErrors } = options;
+    static readFile(buffer, options = { ignoreErrors: false, untilTag: null }) {
+        const { ignoreErrors, untilTag } = options;
         var stream = new ReadBufferStream(buffer),
             useSyntax = EXPLICIT_LITTLE_ENDIAN;
         stream.reset();
         stream.increment(128);
-        if (stream.readString(4) != "DICM") {
+        if (stream.readString(4) !== "DICM") {
             throw new Error("Invalid a dicom file");
         }
         var el = DicomMessage.readTag(stream, useSyntax),
@@ -86,7 +91,12 @@ class DicomMessage {
         //get the syntax
         var mainSyntax = metaHeader["00020010"].Value[0];
         mainSyntax = DicomMessage._normalizeSyntax(mainSyntax);
-        var objects = DicomMessage.read(stream, mainSyntax, ignoreErrors);
+        var objects = DicomMessage.read(
+            stream,
+            mainSyntax,
+            ignoreErrors,
+            untilTag
+        );
 
         var dicomDict = new DicomDict(metaHeader);
         dicomDict.dict = objects;
@@ -173,13 +183,16 @@ class DicomMessage {
         } else {
             var val = vr.read(stream, length, syntax);
             if (!vr.isBinary() && singleVRs.indexOf(vr.type) == -1) {
-                values = val.split(String.fromCharCode(0x5c));
+                values = val;
+                if (typeof val === "string") {
+                    values = val.split(String.fromCharCode(0x5c));
+                }
             } else if (vr.type == "SQ") {
                 values = val;
             } else if (vr.type == "OW" || vr.type == "OB") {
                 values = val;
             } else {
-                values.push(val);
+                Array.isArray(val) ? (values = val) : values.push(val);
             }
         }
         stream.setEndian(oldEndian);

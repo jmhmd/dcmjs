@@ -1,7 +1,8 @@
 import { DicomMetaDictionary } from "../../DicomMetaDictionary.js";
-import { StructuredReport } from "../../derivations.js";
+import { StructuredReport } from "../../derivations/";
 import TID1500MeasurementReport from "../../utilities/TID1500/TID1500MeasurementReport.js";
 import TID1501MeasurementGroup from "../../utilities/TID1500/TID1501MeasurementGroup.js";
+import { toArray, codeMeaningEquals, graphicTypeEquals } from "../helpers.js";
 
 function getTID300ContentItem(tool, toolClass) {
     const args = toolClass.getTID300RepresentationArguments(tool);
@@ -33,8 +34,11 @@ export default class MeasurementReport {
         const measurementsByGraphicType = {};
         rois.forEach(roi => {
             const graphicType = roi.scoord3d.graphicType;
-            // adding z coord as 0
-            roi.scoord3d.coordinates.map(coord => coord.push(0));
+
+            if (graphicType !== "POINT") {
+                // adding z coord as 0
+                roi.scoord3d.graphicData.map(coord => coord.push(0));
+            }
 
             if (!measurementsByGraphicType[graphicType]) {
                 measurementsByGraphicType[graphicType] = [];
@@ -64,7 +68,7 @@ export default class MeasurementReport {
         });
 
         const MeasurementReport = new TID1500MeasurementReport(
-            allMeasurementGroups,
+            { TID1501MeasurementGroups: allMeasurementGroups },
             options
         );
 
@@ -127,7 +131,67 @@ export default class MeasurementReport {
 
     //@ToDo
     static generateToolState(dataset) {
-        throw new Error("not yet implemented");
+        // For now, bail out if the dataset is not a TID1500 SR with length measurements
+        if (dataset.ContentTemplateSequence.TemplateIdentifier !== "1500") {
+            throw new Error(
+                "This package can currently only interpret DICOM SR TID 1500"
+            );
+        }
+
+        const REPORT = "Imaging Measurements";
+        const GROUP = "Measurement Group";
+
+        // Split the imagingMeasurementContent into measurement groups by their code meaning
+        const imagingMeasurementContent = toArray(dataset.ContentSequence).find(
+            codeMeaningEquals(REPORT)
+        );
+
+        // Retrieve the Measurements themselves
+        const measurementGroups = toArray(
+            imagingMeasurementContent.ContentSequence
+        ).filter(codeMeaningEquals(GROUP));
+
+        // // For each of the supported measurement types, compute the measurement data
+        const measurementData = {};
+
+        measurementGroups.forEach(mg => {
+            Object.keys(
+                MeasurementReport.MICROSCOPY_TOOL_CLASSES_BY_UTILITY_TYPE
+            ).forEach(measurementType => {
+                // Find supported measurement types in the Structured Report
+                const measurementGroupContentSequence = toArray(
+                    mg.ContentSequence
+                );
+                let measurementContent = measurementGroupContentSequence.filter(
+                    graphicTypeEquals(measurementType.toUpperCase())
+                );
+                if (!measurementContent || measurementContent.length === 0) {
+                    return;
+                }
+
+                const toolClass =
+                    MeasurementReport.MICROSCOPY_TOOL_CLASSES_BY_UTILITY_TYPE[
+                        measurementType
+                    ];
+                const toolType = toolClass.toolType;
+
+                if (!toolClass.getMeasurementData) {
+                    throw new Error(
+                        "MICROSCOPY Tool Adapters must define a getMeasurementData static method."
+                    );
+                }
+
+                if (!measurementData[toolType]) {
+                    measurementData[toolType] = [];
+                }
+                measurementData[toolType] = [
+                    ...measurementData[toolType],
+                    ...toolClass.getMeasurementData(measurementContent)
+                ];
+            });
+        });
+
+        return measurementData;
     }
 
     static registerTool(toolClass) {
