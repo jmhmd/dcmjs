@@ -30,15 +30,22 @@ const encapsulatedSyntaxes = [
 ];
 
 class DicomMessage {
-    static read(bufferStream, syntax, ignoreErrors, untilTag) {
+    static read(bufferStream, syntax, ignoreErrors, untilTag, stopAfterTag) {
         var dict = {};
         try {
+            let breakOnNextLoop = false;
             while (!bufferStream.end()) {
+                if (breakOnNextLoop === true) {
+                    break;
+                }
                 const readInfo = DicomMessage.readTag(bufferStream, syntax);
                 const cleanTagString = readInfo.tag.toCleanString();
 
                 if (untilTag && untilTag === cleanTagString) {
                     break;
+                }
+                if (stopAfterTag && stopAfterTag === cleanTagString) {
+                    breakOnNextLoop = true;
                 }
 
                 dict[cleanTagString] = {
@@ -72,8 +79,11 @@ class DicomMessage {
         return encapsulatedSyntaxes.indexOf(syntax) != -1;
     }
 
-    static readFile(buffer, options = { ignoreErrors: false, untilTag: null }) {
-        const { ignoreErrors, untilTag } = options;
+    static readFile(
+        buffer,
+        options = { ignoreErrors: false, untilTag: null, stopAfterTag: null }
+    ) {
+        const { ignoreErrors, untilTag, stopAfterTag } = options;
         var stream = new ReadBufferStream(buffer),
             useSyntax = EXPLICIT_LITTLE_ENDIAN;
         stream.reset();
@@ -95,7 +105,8 @@ class DicomMessage {
             stream,
             mainSyntax,
             ignoreErrors,
-            untilTag
+            untilTag,
+            stopAfterTag
         );
 
         var dicomDict = new DicomDict(metaHeader);
