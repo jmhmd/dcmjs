@@ -308,7 +308,7 @@ class BinaryRepresentation extends ValueRepresentation {
                 frames = [];
             if (itemTagValue.is(0xfffee000)) {
                 var itemLength = stream.readUint32(),
-                    numOfFrames = 1,
+                    numOfFrames = 0,
                     offsets = [];
                 if (itemLength > 0x0) {
                     //has frames
@@ -317,11 +317,12 @@ class BinaryRepresentation extends ValueRepresentation {
                     while (i++ < numOfFrames) {
                         offsets.push(stream.readUint32());
                     }
-                } else {
-                    offsets = [0];
-                }
+                } /*  else {
+                    offsets = [];
+                } */
 
-                for (let i = 0; i < offsets.length; i++) {
+                while (stream.offset < stream.size) {
+                    // for (let i = 0; i < offsets.length; i++) {
                     const nextTag = Tag.readTag(stream);
 
                     if (!nextTag.is(0xfffee000)) {
