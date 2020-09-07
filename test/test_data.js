@@ -236,6 +236,81 @@ const tests = {
     dataset._meta = dcmjs.data.DicomMetaDictionary.namifyDataset(dicomData.meta);
     expect(dataset.NumberOfFrames).to.equal(117);
     console.log("Finished test_multiframe_us")
+  },
+
+  test_untilTag: () => {
+    const dicomJSON = `
+      [
+        {
+          "00100010": {
+            "vr": "PN",
+            "Value": [ "Fake Patient 1" ]
+          },
+          "0020000D": {
+            "vr": "UI",
+            "Value": [ "1.2.392.200036.9116.2.2.2.1762893313.1029997326.945873" ]
+          }
+        }
+    ]`;
+    const dicomDict = new DicomDict(metadata);
+    const datasets = JSON.parse(dicomJSON)[0];
+    dicomDict.dict = datasets;
+    const part10Buffer = dicomDict.write();
+
+    let dicomData;
+    let natural;
+
+    dicomData = dcmjs.data.DicomMessage.readFile(part10Buffer);
+    natural = DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+    expect(natural.PatientName).to.equal('Fake Patient 1');
+    expect(natural.StudyInstanceUID).to.equal('1.2.392.200036.9116.2.2.2.1762893313.1029997326.945873');
+
+    dicomData = dcmjs.data.DicomMessage.readFile(part10Buffer, {
+      untilTag: '00100010'
+    });
+    natural = DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+    expect(natural).to.not.have.property('PatientName');
+    expect(natural).to.not.have.property('StudyInstanceUID');
+
+
+    dicomData = dcmjs.data.DicomMessage.readFile(part10Buffer, {
+      stopAfterTag: '0010,0010'
+    });
+    natural = DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+    expect(natural.PatientName).to.equal('Fake Patient 1');
+    expect(natural).to.not.have.property('StudyInstanceUID');
+
+    dicomData = dcmjs.data.DicomMessage.readFile(part10Buffer, {
+      untilTag: '(0020,000D)'
+    });
+    natural = DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+    expect(natural.PatientName).to.equal('Fake Patient 1');
+    expect(natural).to.not.have.property('StudyInstanceUID');
+
+
+    dicomData = dcmjs.data.DicomMessage.readFile(part10Buffer, {
+      stopAfterTag: 'x0020000D'
+    });
+    natural = DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+    expect(natural.PatientName).to.equal('Fake Patient 1');
+    expect(natural.StudyInstanceUID).to.equal('1.2.392.200036.9116.2.2.2.1762893313.1029997326.945873');
+
+    dicomData = dcmjs.data.DicomMessage.readFile(part10Buffer, {
+      untilTag: 'StudyInstanceUID'
+    });
+    natural = DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+    expect(natural.PatientName).to.equal('Fake Patient 1');
+    expect(natural).to.not.have.property('StudyInstanceUID');
+
+
+    dicomData = dcmjs.data.DicomMessage.readFile(part10Buffer, {
+      stopAfterTag: 'PatientName'
+    });
+    natural = DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+    expect(natural.PatientName).to.equal('Fake Patient 1');
+    expect(natural).to.not.have.property('StudyInstanceUID');
+
+    console.log("Finished test_untilTag")
   }
 }
 

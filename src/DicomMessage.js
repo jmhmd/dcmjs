@@ -32,6 +32,9 @@ const encapsulatedSyntaxes = [
 class DicomMessage {
     static read(bufferStream, syntax, ignoreErrors, untilTag, stopAfterTag) {
         var dict = {};
+        var untilTagNormalized = Tag.fromDirtyString(untilTag);
+        var stopAfterTagNormalized = Tag.fromDirtyString(stopAfterTag);
+
         try {
             let breakOnNextLoop = false;
             while (!bufferStream.end()) {
@@ -41,10 +44,16 @@ class DicomMessage {
                 const readInfo = DicomMessage.readTag(bufferStream, syntax);
                 const cleanTagString = readInfo.tag.toCleanString();
 
-                if (untilTag && untilTag === cleanTagString) {
+                if (
+                    untilTagNormalized &&
+                    untilTagNormalized.toCleanString() === cleanTagString
+                ) {
                     break;
                 }
-                if (stopAfterTag && stopAfterTag === cleanTagString) {
+                if (
+                    stopAfterTagNormalized &&
+                    stopAfterTagNormalized.toCleanString() === cleanTagString
+                ) {
                     breakOnNextLoop = true;
                 }
 
