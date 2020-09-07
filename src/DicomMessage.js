@@ -121,7 +121,7 @@ class DicomMessage {
         tag.write(stream, vr, values, syntax);
     }
 
-    static write(jsonObjects, useStream, syntax) {
+    static write(jsonObjects, useStream, syntax, writeOptions) {
         var written = 0;
 
         var sortedTags = Object.keys(jsonObjects).sort();
@@ -131,7 +131,13 @@ class DicomMessage {
                 vrType = tagObject.vr,
                 values = tagObject.Value;
 
-            written += tag.write(useStream, vrType, values, syntax);
+            written += tag.write(
+                useStream,
+                vrType,
+                values,
+                syntax,
+                writeOptions
+            );
         });
 
         return written;
