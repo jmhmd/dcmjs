@@ -227,16 +227,27 @@ const tests = {
   },
 
   test_multiframe_us: () => {
-    const file = fs.readFileSync(path.join(__dirname, 'cine-test.dcm'));
-    const dicomData = dcmjs.data.DicomMessage.readFile(file.buffer, {
-      // ignoreErrors: true,
-    });
-    const dataset = dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomData.dict);
-    // eslint-disable-next-line no-underscore-dangle
-    dataset._meta = dcmjs.data.DicomMetaDictionary.namifyDataset(dicomData.meta);
-    expect(dataset.NumberOfFrames).to.equal(117);
-    console.log("Finished test_multiframe_us")
-  }
+    const usCineURL = "https://github.com/dcmjs-org/data/releases/download/us-multiframe-cine/us-cine.zip";
+    const zipFilePath = path.join(os.tmpdir(), "us-cine.zip");
+    const unzipPath = path.join(os.tmpdir(), "us-cine.dcm");
+
+    downloadToFile(usCineURL, zipFilePath)
+      .then(() => {
+        fs.createReadStream(zipFilePath)
+          .pipe(unzipper.Extract({ path: unzipPath })
+            .on('close', () => {
+              const file = fs.readFileSync(path.join(__dirname, 'cine-test.dcm'));
+              const dicomData = dcmjs.data.DicomMessage.readFile(file.buffer, {
+                // ignoreErrors: true,
+              });
+              const dataset = dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+              // eslint-disable-next-line no-underscore-dangle
+              dataset._meta = dcmjs.data.DicomMetaDictionary.namifyDataset(dicomData.meta);
+              expect(dataset.NumberOfFrames).to.equal(117);
+              console.log("Finished test_multiframe_us")
+            }))
+      })
+  },
 }
 
 
